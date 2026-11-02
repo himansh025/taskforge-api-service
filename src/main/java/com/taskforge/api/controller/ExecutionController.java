@@ -64,6 +64,21 @@ public class ExecutionController {
         }
     }
 
+    @GetMapping("/workspaces/{workspaceId}/executions")
+    public ResponseEntity<Object> listExecutions(@PathVariable UUID workspaceId) {
+        RestClient client = restClientBuilder.baseUrl(orchestratorUrl).build();
+        try {
+            Object result = client.get()
+                    .uri("/api/v1/engine/workspaces/{id}/executions", workspaceId)
+                    .retrieve()
+                    .body(Object.class);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("Failed to list executions for workspace {}: {}", workspaceId, e.getMessage());
+            return ResponseEntity.ok(java.util.List.of());
+        }
+    }
+
     @PostMapping("/executions/{executionId}/cancel")
     public ResponseEntity<Object> cancelExecution(@PathVariable UUID executionId) {
         RestClient client = restClientBuilder.baseUrl(orchestratorUrl).build();
