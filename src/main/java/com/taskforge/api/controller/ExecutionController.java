@@ -79,6 +79,21 @@ public class ExecutionController {
         }
     }
 
+    @PostMapping("/executions/{executionId}/retry")
+    public ResponseEntity<Object> retryExecution(@PathVariable UUID executionId) {
+        RestClient client = restClientBuilder.baseUrl(orchestratorUrl).build();
+        try {
+            Object result = client.post()
+                    .uri("/api/v1/engine/executions/{id}/retry", executionId)
+                    .retrieve()
+                    .body(Object.class);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("Failed to retry execution {}: {}", executionId, e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @GetMapping(value = "/executions/{executionId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamExecutionEvents(@PathVariable UUID executionId) {
         SseEmitter emitter = new SseEmitter(180_000L); // 3 minutes timeout

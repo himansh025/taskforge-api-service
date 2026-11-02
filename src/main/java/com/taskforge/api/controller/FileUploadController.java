@@ -1,26 +1,35 @@
 package com.taskforge.api.controller;
 
+import io.minio.GetObjectArgs;
+import io.minio.MinioClient;
+import io.minio.PutObjectArgs;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.io.InputStream;
 import java.util.Map;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1")
+@RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 @Slf4j
 public class FileUploadController {
 
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final MinioClient minioClient;
 
-    @PostMapping(value = "/workspaces/{workspaceId}/uploads", consumes = "multipart/form-data")
+    @Value("${taskforge.minio.bucket:taskforge-artifacts}")
+    private String bucket;
+
+    @PostMapping(value = "/workspaces/{workspaceId}/uploads", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Map<String, Object>> uploadFile(
             @PathVariable UUID workspaceId,
             @RequestParam("file") MultipartFile file) {
@@ -30,25 +39,49 @@ public class FileUploadController {
         String artifactKey = "workspaces/" + workspaceId + "/uploads/" + fileId + "/" + originalFilename;
 
         try {
-            // Stream upload to MinIO bucket
-            String minioUrl = System.getenv().getOrDefault("MINIO_ENDPOINT", "http://minio:9000");
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(minioUrl + "/taskforge-artifacts/" + artifactKey))
-                    .header("Content-Type", file.getContentType() != null ? file.getContentType() : "text/csv")
-                    .PUT(HttpRequest.BodyPublishers.ofByteArray(file.getBytes()))
-                    .build();
-
-            httpClient.send(request, HttpResponse.BodyHandlers.discarding());
-            log.info("Uploaded artifact to MinIO: {}", artifactKey);
+            minioClient.putObject(
+                    PutObjectArgs.builder()
+                            .bucket(bucket)
+                            .object(artifactKey)
+                            .stream(file.getInputStream(), file.getSize(), -1)
+                            .contentType(file.getContentType() != null ? file.getContentType() : "text/csv")
+                            .build()
+            );
+            log.info("Successfully uploaded artifact {} ({} bytes) to MinIO", artifactKey, file.getSize());
         } catch (Exception e) {
-            log.warn("MinIO direct upload fallback (using metadata only): {}", e.getMessage());
+            log.error("Failed to store artifact in MinIO: {}", e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of("error", "Storage error: " + e.getMessage()));
         }
 
         return ResponseEntity.ok(Map.of(
                 "artifactKey", artifactKey,
                 "filename", originalFilename,
                 "size", file.getSize(),
-                "fileId", fileId
+                "fileId", fileId,
+                "bucket", bucket
         ));
+    }
+
+    @GetMapping("/artifacts/**")
+    public ResponseEntity<InputStreamResource> downloadArtifact(jakarta.servlet.http.HttpServletRequest request) {
+        String fullPath = request.getRequestURI();
+        String artifactKey = fullPath.substring("/api/v1/artifacts/".length());
+
+        try {
+            InputStream stream = minioClient.getObject(
+                    GetObjectArgs.builder()
+                            .bucket(bucket)
+                            .object(artifactKey)
+                            .build()
+            );
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + artifactKey.substring(artifactKey.lastIndexOf('/') + 1) + "\"")
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .body(new InputStreamResource(stream));
+        } catch (Exception e) {
+            log.error("Failed to retrieve artifact {}: {}", artifactKey, e.getMessage());
+            return ResponseEntity.notFound().build();
+        }
     }
 }
