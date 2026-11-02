@@ -20,11 +20,15 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
       acks: all
 
 management:
@@ -37,6 +41,8 @@ management:
       show-details: when_authorized
 
 taskforge:
+  orchestrator:
+    url: ${ORCHESTRATOR_SERVICE_URL:http://orchestrator-service:8081}
   kafka:
     topics:
       workflow-execution-requested: workflow.execution.requested.v1

@@ -4,7 +4,9 @@ import com.taskforge.common.model.WorkflowStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -36,6 +38,7 @@ public class WorkflowEntity {
     @Builder.Default
     private WorkflowStatus status = WorkflowStatus.DRAFT;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "draft_definition", columnDefinition = "JSONB")
     private String draftDefinition;
 

@@ -3,6 +3,8 @@ package com.taskforge.api.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -26,6 +28,7 @@ public class WorkflowVersionEntity {
     @Column(name = "version_number", nullable = false)
     private Integer versionNumber;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "definition_json", nullable = false, columnDefinition = "JSONB")
     private String definitionJson;
 

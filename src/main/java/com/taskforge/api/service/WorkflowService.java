@@ -235,6 +235,7 @@ public class WorkflowService {
                 .triggerType("MANUAL")
                 .input(input != null ? input : Collections.emptyMap())
                 .definitionHash(latest.getDefinitionHash())
+                .definitionJson(latest.getDefinitionJson())
                 .build();
 
         EventEnvelope<WorkflowExecutionRequestedData> envelope = EventEnvelope.<WorkflowExecutionRequestedData>builder()
